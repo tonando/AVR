@@ -1,0 +1,37 @@
+#include <SoftwareSerial.h>
+//MIDI_CREATE_DEFAULT_INSTANCE();
+// Variables:
+byte cc = 0;
+byte AnalogValue = 0; // define variables for the controller data
+byte lastAnalogValue[3]; // define the "lastValue" variables
+byte thresh = 2;//try 4 or 8
+int pots[]={
+  1,2,3};
+int number = 4;
+ //software serial
+ SoftwareSerial midiSerial(0, 1); // digital pins that we'll use for soft serial RX & TX
+ ﻿
+void setup() {
+ 
+  //  launch MIDI
+  midiSerial.begin(31250);
+  // MIDI.begin(1);
+}
+
+void loop() {
+  for(int i = 0; i < 3; i++){
+    cc = analogRead(pots[i])/8;
+    if(abs(cc - lastAnalogValue[i]) > (thresh)) {
+      // MIDI.sendControlChange(16,cc/8,1);
+      // update lastAnalogValue variable
+      controlChange(0, number +i, cc);
+      lastAnalogValue[i] = cc;
+    }  //  endif
+  }
+}
+// Continuous Controller Function
+void controlChange(byte ChannelByte,byte ControlNumber,byte ControlValue){
+  midiSerial.write(ChannelByte + 0xb0);
+  midiSerial.write(ControlNumber);
+  midiSerial.write(ControlValue);
+}

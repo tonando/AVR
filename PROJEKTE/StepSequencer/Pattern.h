@@ -1,0 +1,22 @@
+#ifndef Pattern_h
+#define Pattern_h
+
+#include "Config.h"
+
+#define INIT_PATTERN_LENGTH 	INTERFACE_SIZE
+#define MAX_PATTERN_LENGTH 		32
+
+///////////////////////////////////////////////////////////////
+//	Pattern
+
+struct Pattern{
+	byte length : 4;	// 3 bits = 2^1-5 ... 5bits = 0-31
+	bool on 	: 1;
+	bool mute 	: 1;
+	bool solo 	: 1;
+	Step *steps;
+};
+
+void Pattern_init(byte,byte);
+
+#endif

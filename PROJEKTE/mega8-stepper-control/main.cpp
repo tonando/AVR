@@ -1,0 +1,148 @@
+//#include <Macros.h>
+#include <avr/io.h>
+#include <stdbool.h>
+#include <inttypes.h>
+#include <avr/interrupt.h>
+#include <util/delay.h>
+
+#define sbi(b,n) (b) |= _BV( (n) )
+#define cbi(b,n) (b) &= ~(_BV( (n) ))
+#define rbi(b,n) (((b) >> (n)) & 1)
+#define fbi(b,n) (b) ^= _BV( (n) )
+
+/* 
+	Stepper X: PORTB 0x0F
+	Stepper Y: PORTB 0xF0
+	Stepper Z: PORTC 0x0F
+ */
+
+// #define JOYSTICK	1
+	
+// #define TIMEOUT 50			// 102,4 ms
+#define NUM_STEPPERS 	3
+#define TIMEOUT 		240		// ~20ms
+// #define PULSELENGTH 	200		// uS
+
+#define STEP_X 	PD0
+#define STEP_Y 	PD1
+#define STEP_Z	PD2
+ 
+#define DIR_X	PD3
+#define DIR_Y	PD4
+#define DIR_Z	PD5
+
+#define ENABLE_PIN		PD7		
+#define HALFSTEP_MODE	PD6		
+
+
+typedef unsigned char uchar;
+
+const uchar STEP_SEQUENCE[8] = {0b10101010,0b00100010,0b01100110,0b01000100,0b01010101,0b00010001,0b10011001,0b10001000};
+
+uchar steppers[NUM_STEPPERS];
+uchar input,last_input;
+bool USE_ENABLE_PIN;
+bool halfstep = true;
+
+volatile uchar timeout[NUM_STEPPERS]={TIMEOUT,TIMEOUT,TIMEOUT};
+
+bool getDir(uchar s){
+   return (rbi(input,3+s));
+}
+
+void updateMotors(){
+
+   uchar tmp=0;   
+   if(USE_ENABLE_PIN && rbi(PIND,ENABLE_PIN) == false){
+	   PORTB=0;
+	   PORTC=0;
+	   return;
+   }
+   
+   if(timeout[1])
+	tmp = STEP_SEQUENCE[ halfstep ? steppers[1] : (steppers[1]<<1) ] & 0xf0;
+
+   if(timeout[0])
+	tmp |= STEP_SEQUENCE[ halfstep ? steppers[0] : (steppers[0]<<1) ] & 0x0f;
+   
+	PORTB = tmp;
+	tmp = 0;   
+
+   if(timeout[2])
+      tmp |= STEP_SEQUENCE[ halfstep ? steppers[2] : (steppers[2]<<1) ] & 0x0f;
+
+	PORTC = tmp;
+	
+#ifdef PULSELENGTH
+	_delay_us(PULSELENGTH);
+	PORTB=0;
+	PORTC=0;
+#endif	
+}
+   
+void step(uint8_t i){
+   // if(i >= NUM_STEPPERS)
+	// return;
+   
+   //reset timeout
+   timeout[i] = TIMEOUT;
+   
+  uchar step = steppers[i] & 0x0f;
+   
+   if(getDir(i)){
+	 step++;
+	 step &= halfstep ? 7 : 3;
+   }
+   else{
+	 if(step)
+	  step--;
+	 else
+	  step = halfstep ? 7 : 3;
+   }
+   steppers[i] = step;
+   
+} 
+
+int main()
+ { 
+   DDRB=0xff;
+   DDRC=0xff;
+   
+   DDRD=0x00;
+   PORTD |= _BV(ENABLE_PIN) | _BV(HALFSTEP_MODE);
+   
+ 
+   TCCR0 = 3;
+   TIMSK |= _BV(TOIE0);
+   
+   if(!rbi(PIND,ENABLE_PIN))
+	   USE_ENABLE_PIN = true;
+   
+   sei(); 
+   
+   while (1){
+		input = PIND;
+
+		for(uchar i=0; i<NUM_STEPPERS; i++)
+			if(rbi(input,i) && !rbi(last_input,i))
+				step(i);
+		  
+		updateMotors();
+
+		last_input = input;
+ 
+      }
+   return 0;
+ }
+ 
+	 
+ ISR(TIMER0_OVF_vect){
+    // if(rbi(PIND,ENABLE_PIN)){
+   
+		uchar i=NUM_STEPPERS;
+		do{i--;
+			if(timeout[i])
+				timeout[i]--;
+		}while(i);
+	// }
+ }

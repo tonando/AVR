@@ -1,0 +1,8 @@
+#include "test.h"
+
+unsigned char sss(unsigned int ucAddress)
+{
+/* Wait for completion of previous write */
+
+return ucAddress*5;
+}
